@@ -5,7 +5,7 @@ USER root
 RUN npm install --registry=https://registry.npmmirror.com
 RUN npm run build
 
-FROM registry.cn-hangzhou.aliyuncs.com/library/node:18-alpine
+FROM public-cn-beijing.cr.volces.com/public/base:node-16-alpine
 WORKDIR /opt/application/
 COPY --from=builder /opt/application/dist ./dist
 COPY --from=builder /opt/application/client ./client
@@ -13,6 +13,6 @@ COPY --from=builder /opt/application/run.sh ./
 COPY package.json ./
 USER root
 RUN npm install --production --registry=https://registry.npmmirror.com
-RUN chmod +x /opt/application/run.sh
+RUN chmod -R 777 /opt/application/run.sh
 EXPOSE 8000
-CMD ["/opt/application/run.sh"]
+CMD /opt/application/run.sh
