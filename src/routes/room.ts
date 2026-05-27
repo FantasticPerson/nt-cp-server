@@ -72,6 +72,11 @@ router.post('/create', async (ctx) => {
     const createResult = await createRoom(roomData);
     console.log('[room] createRoom 返回:', JSON.stringify(createResult));
 
+    // 诊断：查询 rooms 集合所有文档，看实际存储结构
+    const collection = roomsCollection();
+    const allDocs = await collection.limit(10).get();
+    console.log('[room] rooms 集合所有文档:', JSON.stringify(allDocs));
+
     // 立即回查验证
     const verify = await findRoomById(roomId);
     console.log('[room] 创建后立即回查:', verify ? 'found' : 'null');
