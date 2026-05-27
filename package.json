@@ -1,0 +1,23 @@
+{
+  "name": "nt-cp-server",
+  "version": "1.0.0",
+  "description": "南通长牌抖音小游戏服务端",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsc && node dist/server.js"
+  },
+  "dependencies": {
+    "koa": "^2.15.0",
+    "koa-router": "^12.0.1",
+    "koa-bodyparser": "^4.4.1",
+    "@open-dy/node-server-sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/koa": "^2.14.0",
+    "@types/koa-router": "^7.4.8",
+    "@types/koa-bodyparser": "^4.3.12"
+  }
+}
