@@ -202,7 +202,9 @@ router.post('/ready', async (ctx) => {
       return;
     }
 
+    console.log('[room] ready 请求 roomId:', roomId, 'openId:', openId);
     const room = await findRoomById(roomId);
+    console.log('[room] findRoomById 结果:', room ? 'found' : 'null');
     if (!room) {
       ctx.status = 404;
       ctx.body = { error: '房间不存在' };
