@@ -47,6 +47,16 @@ app.use(async (ctx, next) => {
 // Body parser
 app.use(bodyParser());
 
+// 健康检查（抖音云托管要求）
+app.use(async (ctx, next) => {
+  if (ctx.method === 'GET' && ctx.path === '/v1/ping') {
+    ctx.status = 200;
+    ctx.body = 'ok';
+    return;
+  }
+  await next();
+});
+
 // 注册路由
 app.use(roomRouter.routes()).use(roomRouter.allowedMethods());
 app.use(matchRouter.routes()).use(matchRouter.allowedMethods());
