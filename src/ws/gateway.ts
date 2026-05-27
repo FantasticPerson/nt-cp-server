@@ -1,80 +1,63 @@
 /**
- * WS 网关 — 封装抖音云 WebSocket 推送
+ * WS 网关 — 抖音云 WebSocket 推送
  *
- * 抖音云托管中，服务端无法直接向客户端推送 WS 消息，
- * 需通过抖音云 WS 网关的 HTTP API 推送。
+ * 推送 API（抖音云托管内部服务）：
+ * - POST /ws/push_data — 按 sessionId 或 openId 推送（最多 5 个）
  *
- * API: POST https://webcastbytetccd01.zijieapi.com/ws/push_data
- * Header: X-Api-Token: <service_token>
- * Body: { room_id, user_id, data }
+ * Headers:
+ * - X-TT-WS-SESSIONIDS — 目标 sessionId（逗号分隔）
+ * - X-TT-WS-OPENIDS    — 目标 openId（逗号分隔）
+ *
+ * 推送基础 URL 通过 WS_PUSH_BASE_URL 环境变量配置。
  */
 
 import * as https from 'https';
 import { filterStateForPlayer } from '../state-filter';
 
-const WS_GATEWAY_URL = 'https://webcastbytetccd01.zijieapi.com/ws/push_data';
+const WS_PUSH_BASE = process.env.WS_PUSH_BASE_URL || 'https://webcastbytetccd01.zijieapi.com';
 
-/** 从环境变量获取 serviceToken（云托管自动注入） */
-function getServiceToken(): string {
-  const token = process.env.SERVICE_TOKEN;
-  if (!token) {
-    console.warn('[ws-gateway] SERVICE_TOKEN 环境变量未设置，推送将失败');
-  }
-  return token || '';
+// ─── 会话管理 ──────────────────────────────────────────────
+
+const sessionMap = new Map<string, string>();
+
+export function registerSession(sessionId: string, openId: string): void {
+  sessionMap.set(sessionId, openId);
 }
 
-/**
- * 底层推送 — 向抖音云 WS 网关发送 POST 请求
- *
- * @param roomId  容器房间 ID（WebSocket 连接的房间）
- * @param userId  目标用户 openId
- * @param message 要推送的消息对象，会被 JSON.stringify
- */
-async function pushRaw(roomId: string, userId: string, message: any): Promise<void> {
-  const token = getServiceToken();
-  if (!token) {
-    console.error('[ws-gateway] SERVICE_TOKEN 缺失，跳过推送');
-    return;
-  }
+export function unregisterSession(sessionId: string): void {
+  sessionMap.delete(sessionId);
+}
 
-  const body = JSON.stringify({
-    room_id: roomId,
-    user_id: userId,
-    data: JSON.stringify(message),
-  });
+// ─── 底层推送 ──────────────────────────────────────────────
 
-  const options: https.RequestOptions = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Api-Token': token,
-      'Content-Length': Buffer.byteLength(body),
-    },
-  };
+async function pushRaw(path: string, headers: Record<string, string>, message: any): Promise<void> {
+  const url = `${WS_PUSH_BASE}${path}`;
+  const body = JSON.stringify(message);
 
   return new Promise<void>((resolve) => {
-    const req = https.request(WS_GATEWAY_URL, options, (res) => {
+    const req = https.request(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        ...headers,
+      },
+    }, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
           resolve();
         } else {
-          console.error(
-            `[ws-gateway] 推送失败 roomId=${roomId} userId=${userId} ` +
-            `status=${res.statusCode} body=${data}`
-          );
-          resolve(); // 不 reject，避免中断游戏流程
+          console.error(`[ws-gateway] 推送失败 status=${res.statusCode} body=${data}`);
+          resolve();
         }
       });
     });
 
     req.on('error', (err) => {
-      console.error(
-        `[ws-gateway] 推送异常 roomId=${roomId} userId=${userId}`,
-        err.message
-      );
-      resolve(); // 不 reject，避免中断游戏流程
+      console.error('[ws-gateway] 推送异常:', err.message);
+      resolve();
     });
 
     req.write(body);
@@ -82,71 +65,54 @@ async function pushRaw(roomId: string, userId: string, message: any): Promise<vo
   });
 }
 
-/**
- * 推送消息给指定用户
- *
- * @param roomId  容器房间 ID
- * @param openId  目标用户 openId
- * @param message 消息对象
- */
-export async function pushToUser(
-  roomId: string,
-  openId: string,
-  message: any
-): Promise<void> {
-  try {
-    await pushRaw(roomId, openId, message);
-  } catch (err: any) {
-    console.error(`[ws-gateway] pushToUser 失败 openId=${openId}`, err.message);
+/** 按 openId 列表推送（自动分批，每批最多 5 个） */
+async function pushByOpenIds(openIds: string[], message: any): Promise<void> {
+  for (let i = 0; i < openIds.length; i += 5) {
+    const batch = openIds.slice(i, i + 5);
+    await pushRaw('/ws/push_data', { 'X-TT-WS-OPENIDS': batch.join(',') }, message);
   }
 }
 
-/** 玩家信息（用于 pushToRoom / pushToRoomFiltered） */
+// ─── 公共接口 ──────────────────────────────────────────────
+
 export interface PlayerInfo {
   openId: string;
   seatIndex: number;
   online: boolean;
 }
 
-/**
- * 向房间内所有在线玩家推送同一条消息
- *
- * @param roomId  容器房间 ID
- * @param players 玩家列表
- * @param message 消息对象
- */
+export async function pushToUser(
+  _roomId: string,
+  openId: string,
+  message: any
+): Promise<void> {
+  try {
+    await pushByOpenIds([openId], message);
+  } catch (err: any) {
+    console.error(`[ws-gateway] pushToUser 失败 openId=${openId}`, err.message);
+  }
+}
+
 export async function pushToRoom(
-  roomId: string,
+  _roomId: string,
   players: PlayerInfo[],
   message: any
 ): Promise<void> {
-  const tasks = players
-    .filter((p) => p.online)
-    .map((p) => pushToUser(roomId, p.openId, message));
-
-  await Promise.all(tasks);
+  const openIds = players.filter(p => p.online).map(p => p.openId);
+  if (openIds.length === 0) return;
+  await pushByOpenIds(openIds, message);
 }
 
-/**
- * 向房间内每个在线玩家推送经过过滤的状态
- *
- * 对每个玩家，根据其 seatIndex 过滤完整状态后推送，
- * 确保玩家只能看到自己该看到的信息（如手牌）。
- *
- * @param roomId    容器房间 ID
- * @param players   玩家列表
- * @param fullState 完整游戏状态
- */
 export async function pushToRoomFiltered(
-  roomId: string,
+  _roomId: string,
   players: PlayerInfo[],
   fullState: any
 ): Promise<void> {
   const tasks = players
-    .filter((p) => p.online)
-    .map((p) => {
+    .filter(p => p.online)
+    .map(p => {
       const filteredState = filterStateForPlayer(fullState, p.seatIndex);
-      return pushToUser(roomId, p.openId, filteredState);
+      return pushByOpenIds([p.openId], filteredState);
     });
 
   await Promise.all(tasks);
