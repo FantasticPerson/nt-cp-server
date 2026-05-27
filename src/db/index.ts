@@ -13,14 +13,26 @@ export function initDatabase(): any {
     return database;
   }
   try {
-    const openDyCloud = require('@open-dy/node-server-sdk') as any;
-    if (typeof openDyCloud.init === 'function') {
-      const cloud = openDyCloud.init();
-      database = cloud.database();
-      console.log('[db] 云数据库初始化成功');
-    } else {
-      console.warn('[db] @open-dy/node-server-sdk.init 不可用，数据库功能降级');
+    const sdk = require('@open-dy/node-server-sdk') as any;
+
+    // 方式1: 直接调 database()
+    if (typeof sdk.database === 'function') {
+      database = sdk.database();
+      console.log('[db] 云数据库初始化成功 (sdk.database)');
+      return database;
     }
+
+    // 方式2: 先 init() 再 database()
+    if (typeof sdk.init === 'function') {
+      const cloud = sdk.init();
+      if (cloud && typeof cloud.database === 'function') {
+        database = cloud.database();
+        console.log('[db] 云数据库初始化成功 (sdk.init.database)');
+        return database;
+      }
+    }
+
+    console.warn('[db] @open-dy/node-server-sdk 无法初始化，数据库功能降级');
   } catch (err: any) {
     console.warn('[db] 云数据库初始化失败:', err.message, '，数据库功能降级');
   }
