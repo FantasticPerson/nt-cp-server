@@ -13,11 +13,9 @@ export function initDatabase(): any {
     return database;
   }
   try {
-    const sdk = require('@open-dy/node-server-sdk') as any;
-    console.log('[db] SDK type:', typeof sdk, 'keys:', sdk ? Object.keys(sdk).join(',') : 'null');
-    if (sdk && typeof sdk.default === 'object') {
-      console.log('[db] SDK.default keys:', Object.keys(sdk.default).join(','));
-    }
+    const pkg = require('@open-dy/node-server-sdk') as any;
+    const sdk = pkg.dySDK || pkg.default || pkg;
+    console.log('[db] SDK resolved keys:', sdk ? Object.keys(sdk).join(',') : 'null');
 
     // 方式1: 直接调 database()
     if (typeof sdk.database === 'function') {
