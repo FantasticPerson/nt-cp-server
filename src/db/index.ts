@@ -14,6 +14,10 @@ export function initDatabase(): any {
   }
   try {
     const sdk = require('@open-dy/node-server-sdk') as any;
+    console.log('[db] SDK type:', typeof sdk, 'keys:', sdk ? Object.keys(sdk).join(',') : 'null');
+    if (sdk && typeof sdk.default === 'object') {
+      console.log('[db] SDK.default keys:', Object.keys(sdk.default).join(','));
+    }
 
     // 方式1: 直接调 database()
     if (typeof sdk.database === 'function') {
