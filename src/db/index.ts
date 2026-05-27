@@ -68,7 +68,7 @@ export interface RoomData {
 /** 创建房间 */
 export async function createRoom(data: RoomData): Promise<any> {
   const collection = roomsCollection();
-  const result = await collection.add({ data });
+  const result = await collection.add(data);
   console.log('[db] createRoom 结果:', JSON.stringify(result));
   return result;
 }
@@ -78,7 +78,7 @@ export async function findRoomById(roomId: string): Promise<any> {
   const collection = roomsCollection();
   console.log('[db] findRoomById 查询 roomId:', roomId);
   const result = await collection.where({ roomId }).get();
-  console.log('[db] findRoomById 查询结果 data.length:', result.data ? result.data.length : 'no data', 'raw:', JSON.stringify(result));
+  console.log('[db] findRoomById 查询结果 data.length:', result.data ? result.data.length : 'no data');
   if (result.data && result.data.length > 0) {
     return result.data[0];
   }
@@ -88,7 +88,7 @@ export async function findRoomById(roomId: string): Promise<any> {
 /** 更新房间（通过文档 _id） */
 export async function updateRoom(id: string, data: Partial<RoomData>): Promise<any> {
   const collection = roomsCollection();
-  return collection.doc(id).update({ data });
+  return collection.doc(id).update(data);
 }
 
 /** 删除房间（通过文档 _id） */
@@ -109,7 +109,7 @@ export interface QueueData {
 /** 加入匹配队列 */
 export async function addToQueue(data: QueueData): Promise<any> {
   const collection = matchQueueCollection();
-  return collection.add({ data });
+  return collection.add(data);
 }
 
 /** 按模式查找队列中的玩家 */
