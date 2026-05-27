@@ -65,6 +65,8 @@ app.use(wsRouter.routes()).use(wsRouter.allowedMethods());
 // ─── 初始化 ───────────────────────────────────────────────
 
 // 初始化数据库连接
+
+console.log('in bendi')
 initDatabase();
 
 // 创建 GameManager，注入 WS 网关

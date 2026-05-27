@@ -69,7 +69,12 @@ router.post('/create', async (ctx) => {
       gameData: null,
     };
 
-    await createRoom(roomData);
+    const createResult = await createRoom(roomData);
+    console.log('[room] createRoom 返回:', JSON.stringify(createResult));
+
+    // 立即回查验证
+    const verify = await findRoomById(roomId);
+    console.log('[room] 创建后立即回查:', verify ? 'found' : 'null');
 
     ctx.body = { roomId, seatIndex: 0 };
   } catch (err: any) {
@@ -192,6 +197,7 @@ router.post('/leave', async (ctx) => {
 
 /** POST /api/room/ready — 切换准备状态 */
 router.post('/ready', async (ctx) => {
+    console.log('in ready')
   try {
     const body = ctx.request.body as any;
     const { roomId, openId } = body;
