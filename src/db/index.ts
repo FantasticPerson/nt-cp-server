@@ -5,8 +5,6 @@
  * SDK 没有 @types，使用 require + any 类型。
  */
 
-const openDyCloud = require('@open-dy/node-server-sdk') as any;
-
 let database: any = null;
 
 /** 初始化云数据库 SDK，返回 database 实例 */
@@ -14,20 +12,32 @@ export function initDatabase(): any {
   if (database) {
     return database;
   }
-  const cloud = openDyCloud.init();
-  database = cloud.database();
+  try {
+    const openDyCloud = require('@open-dy/node-server-sdk') as any;
+    if (typeof openDyCloud.init === 'function') {
+      const cloud = openDyCloud.init();
+      database = cloud.database();
+      console.log('[db] 云数据库初始化成功');
+    } else {
+      console.warn('[db] @open-dy/node-server-sdk.init 不可用，数据库功能降级');
+    }
+  } catch (err: any) {
+    console.warn('[db] 云数据库初始化失败:', err.message, '，数据库功能降级');
+  }
   return database;
 }
 
 /** 获取 rooms 集合 */
 export function roomsCollection(): any {
   const db = initDatabase();
+  if (!db) throw new Error('数据库未初始化');
   return db.collection('rooms');
 }
 
 /** 获取 match_queue 集合 */
 export function matchQueueCollection(): any {
   const db = initDatabase();
+  if (!db) throw new Error('数据库未初始化');
   return db.collection('match_queue');
 }
 
