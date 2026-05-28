@@ -14,8 +14,16 @@ import {
   initDatabase,
   RoomData,
 } from '../db';
+import { GameManager } from '../game/manager';
 
 const router = new Router({ prefix: '/api/room' });
+
+/** GameManager 单例引用，由入口文件注入 */
+let gameManager: GameManager | null = null;
+
+export function setGameManager(gm: GameManager): void {
+  gameManager = gm;
+}
 
 // 用于生成房间号的字符集：大写字母+数字，排除 I/O/0/1 避免混淆
 const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -69,17 +77,7 @@ router.post('/create', async (ctx) => {
       gameData: null,
     };
 
-    const createResult = await createRoom(roomData);
-    console.log('[room] createRoom 返回:', JSON.stringify(createResult));
-
-    // 诊断：查询 rooms 集合所有文档，看实际存储结构
-    const collection = roomsCollection();
-    const allDocs = await collection.limit(10).get();
-    console.log('[room] rooms 集合所有文档:', JSON.stringify(allDocs));
-
-    // 立即回查验证
-    const verify = await findRoomById(roomId);
-    console.log('[room] 创建后立即回查:', verify ? 'found' : 'null');
+    await createRoom(roomData);
 
     ctx.body = { roomId, seatIndex: 0 };
   } catch (err: any) {
@@ -202,7 +200,6 @@ router.post('/leave', async (ctx) => {
 
 /** POST /api/room/ready — 切换准备状态 */
 router.post('/ready', async (ctx) => {
-    console.log('in ready')
   try {
     const body = ctx.request.body as any;
     const { roomId, openId } = body;
@@ -213,9 +210,7 @@ router.post('/ready', async (ctx) => {
       return;
     }
 
-    console.log('[room] ready 请求 roomId:', roomId, 'openId:', openId);
     const room = await findRoomById(roomId);
-    console.log('[room] findRoomById 结果:', room ? 'found' : 'null');
     if (!room) {
       ctx.status = 404;
       ctx.body = { error: '房间不存在' };
@@ -243,10 +238,21 @@ router.post('/ready', async (ctx) => {
     const allReady = room.players.length === 3 && room.players.every((p: any) => p.ready);
 
     if (allReady) {
-      // TODO: 通知 GameManager 启动游戏（任务12实现）
-      // import { gameManager } from '../game/manager';
-      // await gameManager.createGame(roomId, room);
-      console.log(`[room] 房间 ${roomId} 3人全部 ready，等待 GameManager 启动游戏`);
+      // 3人全部 ready，创建游戏实例（等待所有玩家 WS 连接后再 startGame）
+      if (gameManager) {
+        const players = room.players.map((p: any) => ({
+          openId: p.openId,
+          seatIndex: p.seatIndex,
+        }));
+
+        gameManager.createGame(roomId, {
+          mode: room.mode || 'single',
+          xiEnabled: room.xiEnabled !== false,
+        }, players);
+
+        await updateRoom(room._id, { status: 'playing' });
+        console.log(`[room] 房间 ${roomId} 游戏已创建，等待玩家连接`);
+      }
     }
 
     ctx.body = { ready: player.ready, allReady };

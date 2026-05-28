@@ -68,17 +68,13 @@ export interface RoomData {
 /** 创建房间 */
 export async function createRoom(data: RoomData): Promise<any> {
   const collection = roomsCollection();
-  const result = await collection.add(data);
-  console.log('[db] createRoom 结果:', JSON.stringify(result));
-  return result;
+  return collection.add(data);
 }
 
 /** 根据 roomId 查询房间 */
 export async function findRoomById(roomId: string): Promise<any> {
   const collection = roomsCollection();
-  console.log('[db] findRoomById 查询 roomId:', roomId);
   const result = await collection.where({ roomId }).get();
-  console.log('[db] findRoomById 查询结果 data.length:', result.data ? result.data.length : 'no data');
   if (result.data && result.data.length > 0) {
     return result.data[0];
   }

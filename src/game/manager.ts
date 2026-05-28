@@ -425,6 +425,41 @@ export class GameManager {
   }
 
   /**
+   * 检查游戏是否已启动
+   */
+  isGameStarted(roomId: string): boolean {
+    const roomData = this.rooms.get(roomId);
+    if (!roomData) return false;
+    return roomData.started;
+  }
+
+  /**
+   * 检查房间内所有玩家是否都已在线
+   */
+  allPlayersOnline(roomId: string): boolean {
+    const roomData = this.rooms.get(roomId);
+    if (!roomData) return false;
+    if (!roomData.started) {
+      // 游戏还没开始，检查所有 RemotePlayer 是否在线
+      let allOnline = true;
+      roomData.players.forEach(function (rp: any) {
+        if (!rp._online) allOnline = false;
+      });
+      return allOnline && roomData.players.size === roomData.playerInfos.length;
+    }
+    return true;
+  }
+
+  /**
+   * 获取房间内玩家数量
+   */
+  getPlayerCount(roomId: string): number {
+    const roomData = this.rooms.get(roomId);
+    if (!roomData) return 0;
+    return roomData.playerInfos.length;
+  }
+
+  /**
    * 获取玩家映射（openId → RemotePlayer）
    * 测试辅助方法
    */

@@ -125,6 +125,29 @@ async function handleConnect(ctx: any, openId: string, sessionId: string): Promi
       if (filteredState) {
         await pushToUser(roomId, openId, { type: 'stateUpdate', state: filteredState });
       }
+
+      // 检查是否所有人都已连接，如果是则启动游戏
+      if (gameManager.allPlayersOnline(roomId) && !gameManager.isGameStarted(roomId)) {
+        console.log(`[ws-handler] 房间 ${roomId} 所有玩家已连接，启动游戏`);
+        gameManager.startGame(roomId).catch(function (err: any) {
+          console.error(`[ws-handler] 启动游戏失败:`, err.message);
+        });
+      }
+    }
+
+    // 房间状态为 playing 但游戏还没创建（刚从 ready 切换过来的玩家首次连接）
+    if (room.status === 'playing' && gameManager && !gameManager.hasGame(roomId)) {
+      // 游戏在 ready 接口中已创建，此处不应该发生
+      console.log(`[ws-handler] 房间 ${roomId} 状态为 playing 但游戏不存在`);
+    }
+
+    // 推送 gameStart 消息给刚连接的玩家，告知其座位号
+    if (gameManager && gameManager.hasGame(roomId)) {
+      const seatMap = gameManager.getSeatMap(roomId);
+      const seatIndex = seatMap?.get(openId);
+      if (seatIndex !== undefined) {
+        await pushToUser(roomId, openId, { type: 'gameStart', seatIndex });
+      }
     }
 
     const player = room.players.find((p: any) => p.openId === openId);

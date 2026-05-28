@@ -16,7 +16,7 @@ import bodyParser from 'koa-bodyparser';
 import Router from 'koa-router';
 
 // 路由
-import roomRouter from './routes/room';
+import roomRouter, { setGameManager as setRoomGameManager } from './routes/room';
 import matchRouter from './routes/match';
 import wsRouter, { setGameManager } from './ws/handler';
 
@@ -65,8 +65,6 @@ app.use(wsRouter.routes()).use(wsRouter.allowedMethods());
 // ─── 初始化 ───────────────────────────────────────────────
 
 // 初始化数据库连接
-
-console.log('in bendi')
 initDatabase();
 
 // 创建 GameManager，注入 WS 网关
@@ -76,8 +74,9 @@ const gameManager = new GameManager({
   pushToRoom,
 });
 
-// 将 GameManager 注入到 WS 处理器
+// 将 GameManager 注入到 WS 处理器和房间路由
 setGameManager(gameManager);
+setRoomGameManager(gameManager);
 
 // ─── 启动 ─────────────────────────────────────────────────
 
